@@ -1,0 +1,6 @@
+package-as: BentoNameCopy
+
+ignore:
+  - .gitignore
+  - .pkgmeta
+  - README.md

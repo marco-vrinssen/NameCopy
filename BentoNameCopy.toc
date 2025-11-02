@@ -1,0 +1,7 @@
+## Interface: 110200
+## Title: Bento Name Copy
+## Notes: Adds "Copy Full Name" to player context menus and "Player Names" button to PVP scoreboard
+## Author: MIYANKO
+## Version: 1.0.0
+
+BentoNameCopy.lua

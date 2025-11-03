@@ -1,20 +1,15 @@
-# Bento Name Copy
+# Name Copy
 
-Adds convenient name copying functionality to player context menus and PVP scoreboards.
+World of Warcraft Retail addon that allows you to click player names to copy them to clipboard.
 
 ## Features
 
-- **Copy Full Name** - Adds "Copy Full Name" option to all player context menus (right-click menus)
-- **PVP Scoreboard Names** - Adds "Player Names" button to PVP scoreboard to copy all player names at once
-- **Universal Context Menu** - Works in party frames, raid frames, friends list, chat, group finder, and more
+- Click player names in chat to copy to clipboard
+- Click player names in raid frames to copy
+- Click player names in party frames to copy
+- Automatic clipboard copy with visual confirmation
 
-## Installation
+## Compatibility
 
-1. Download the addon
-2. Extract to `World of Warcraft/_retail_/Interface/AddOns/`
-3. Restart WoW or reload UI with `/reload`
-
-## Usage
-
-- Right-click any player name and select "Copy Full Name" to copy their Name-Realm
-- In PVP scoreboard, click "Player Names" button to see and copy all player names
+- **Interface Version**: 11.2.0 (The War Within)
+- **Game Version**: World of Warcraft Retail

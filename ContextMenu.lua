@@ -15,7 +15,9 @@ local playerContextTypes = {
   OTHER_PLAYER = true,
   ENEMY_PLAYER = true,
   TARGET = true,
-  FOCUS = true
+  FOCUS = true,
+  FRIEND_OFFLINE = true,
+  FRIEND_ONLINE = true
 }
 
 -- Split full name into player name and realm
@@ -214,6 +216,8 @@ local menuTags = {
   "MENU_UNIT_ENEMY_PLAYER",
   "MENU_UNIT_TARGET",
   "MENU_UNIT_FOCUS",
+  "MENU_UNIT_FRIEND_OFFLINE",
+  "MENU_UNIT_FRIEND_ONLINE",
   "MENU_CHAT_LOG_LINK",
   "MENU_CHAT_LOG_FRAME"
 }

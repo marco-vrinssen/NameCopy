@@ -1,12 +1,10 @@
--- Adds "Copy Full Name" menu option to player context menus
+-- Adds "Copy Full Name" option to player context menus
 
--- Group finder menu tags that need special handling
 local finderMenuTags = {
   MENU_LFG_FRAME_SEARCH_ENTRY = true,
   MENU_LFG_FRAME_MEMBER_APPLY = true
 }
 
--- Valid player context types for standard context menus
 local playerContextTypes = {
   PLAYER = true,
   PARTY = true,
@@ -27,7 +25,6 @@ local playerContextTypes = {
   PVP_SCOREBOARD = true
 }
 
--- Parse player name and realm from full name string
 local function parseNameRealm(fullName)
   if not fullName then
     return nil, nil
@@ -37,13 +34,11 @@ local function parseNameRealm(fullName)
   return playerName or fullName, realmName or GetRealmName()
 end
 
--- Extract player info from group finder frame context
 local function extractFinderPlayer(frameOwner)
   if not frameOwner then
     return nil, nil
   end
 
-  -- Handle LFG search result leader
   if frameOwner.resultID and C_LFGList then
     local searchResult = C_LFGList.GetSearchResultInfo(frameOwner.resultID)
     if searchResult and searchResult.leaderName then
@@ -51,7 +46,6 @@ local function extractFinderPlayer(frameOwner)
     end
   end
 
-  -- Handle LFG applicant member
   if frameOwner.memberIdx then
     local parentFrame = frameOwner:GetParent()
     if parentFrame and parentFrame.applicantID and C_LFGList then
@@ -65,7 +59,6 @@ local function extractFinderPlayer(frameOwner)
   return nil, nil
 end
 
--- Resolve player name and realm from menu context
 local function resolvePlayer(frameOwner, menuRoot, menuContext)
   if not menuContext then
     if menuRoot and menuRoot.tag and finderMenuTags[menuRoot.tag] then
@@ -74,12 +67,10 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     return nil, nil
   end
 
-  -- Direct name and server fields
   if menuContext.name and menuContext.server then
     return menuContext.name, menuContext.server
   end
 
-  -- PVP scoreboard context with unit GUID
   if menuContext.which == "PVP_SCOREBOARD" and menuContext.unit and C_PvP then
     local info = C_PvP.GetScoreInfoByPlayerGuid(menuContext.unit)
     if info and info.name then
@@ -87,7 +78,6 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     end
   end
 
-  -- Unit-based context
   if menuContext.unit and UnitExists(menuContext.unit) then
     local unitName = UnitName(menuContext.unit)
     if unitName then
@@ -96,18 +86,15 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     end
   end
 
-  -- BattleNet friend context
   if menuContext.accountInfo and menuContext.accountInfo.gameAccountInfo then
     local gameAccount = menuContext.accountInfo.gameAccountInfo
     return gameAccount.characterName, gameAccount.realmName
   end
 
-  -- Name-only context
   if menuContext.name then
     return parseNameRealm(menuContext.name)
   end
 
-  -- Friends list context
   if menuContext.friendsList and C_FriendList then
     local friendInfo = C_FriendList.GetFriendInfoByIndex(menuContext.friendsList)
     if friendInfo and friendInfo.name then
@@ -115,12 +102,10 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     end
   end
 
-  -- Chat whisper target context
   if menuContext.chatTarget then
     return parseNameRealm(menuContext.chatTarget)
   end
 
-  -- Chat log message context
   if menuContext.lineID and menuContext.chatFrame then
     local messageInfo = menuContext.chatFrame:GetMessageInfo(menuContext.lineID)
     if messageInfo and messageInfo.sender then
@@ -131,7 +116,6 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
   return nil, nil
 end
 
--- Check if menu context is valid for adding copy option
 local function validateContext(menuRoot, menuContext)
   if not menuContext then
     return menuRoot and menuRoot.tag and finderMenuTags[menuRoot.tag]
@@ -140,7 +124,6 @@ local function validateContext(menuRoot, menuContext)
   return menuContext.clubId or (menuContext.which and playerContextTypes[menuContext.which])
 end
 
--- Show dialog with copyable player name
 local function showCopyDialog(playerName)
   local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
   dialog:SetSize(500, 150)
@@ -186,10 +169,8 @@ local function showCopyDialog(playerName)
   dialog:Show()
 end
 
--- Track menus to prevent duplicates
 local processedMenus = {}
 
--- Add copy button to context menu
 local function addCopyButton(frameOwner, menuRoot, menuContext)
   if InCombatLockdown() or not validateContext(menuRoot, menuContext) then
     return
@@ -200,17 +181,14 @@ local function addCopyButton(frameOwner, menuRoot, menuContext)
     return
   end
   
-  -- Create unique key for this menu instance
   local menuKey = string.format("%s-%s-%s", tostring(menuRoot), playerName, realmName)
   
-  -- Skip if already processed
   if processedMenus[menuKey] then
     return
   end
   
   processedMenus[menuKey] = true
   
-  -- Clean up processed menus after menu closes
   C_Timer.After(0.5, function()
     processedMenus[menuKey] = nil
   end)
@@ -226,7 +204,6 @@ local function addCopyButton(frameOwner, menuRoot, menuContext)
   end)
 end
 
--- Menu tags to register copy option with
 local menuTags = {
   "MENU_LFG_FRAME_SEARCH_ENTRY",
   "MENU_LFG_FRAME_MEMBER_APPLY",
@@ -253,7 +230,6 @@ local menuTags = {
   "MENU_CHAT_LOG_FRAME"
 }
 
--- Register addon with all context menu types
 local function registerMenus()
   if not Menu or not Menu.ModifyMenu then
     return false
@@ -266,7 +242,6 @@ local function registerMenus()
   return true
 end
 
--- Initialize with retry if menu API not ready
 if not registerMenus() then
   local attempts = 0
   C_Timer.NewTicker(0.5, function(ticker)
@@ -277,7 +252,6 @@ if not registerMenus() then
   end)
 end
 
--- Register for PVP UI load
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:SetScript("OnEvent", function(_, _, addonName)

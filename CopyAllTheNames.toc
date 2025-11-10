@@ -1,7 +1,8 @@
 ## Interface: 110200
 ## Title: Copy All The Names
-## Notes: Right-click to copy player names from context menus
+## Notes: Copy player names from context menus and scoreboard
 ## Author: MIYANKO
 ## Version: 1.0.0
 
-CopyAllTheNames.lua
+ContextMenu.lua
+Scoreboard.lua

@@ -1,52 +1,23 @@
--- Adds button to PvP scoreboard to copy all player names
+-- Adds "Player Names" button to PVP scoreboard for copying all player names
 
-local function parseNameRealm(fullName)
-  if not fullName then
-    return nil
-  end
-  
-  local playerName, realmName = string.match(fullName, "^([^-]+)-(.+)$")
-  if playerName and realmName then
-    return string.format("%s-%s", playerName, realmName)
-  end
-  
-  return fullName
-end
+local namesDialog = nil
 
-local function getAllScoreboardNames()
-  if not C_PvP or not C_PvP.GetScoreInfo then
-    return {}
-  end
-  
-  local names = {}
-  local scoreInfo = C_PvP.GetScoreInfo()
-  
-  if not scoreInfo then
-    return names
-  end
-  
-  for i = 1, #scoreInfo do
-    local info = scoreInfo[i]
-    if info and info.name then
-      local fullName = parseNameRealm(info.name)
-      if fullName then
-        table.insert(names, fullName)
-      end
-    end
-  end
-  
-  return names
-end
+-- Show or toggle player names dialog
 
-local function showScoreboardCopyDialog()
-  local names = getAllScoreboardNames()
-  
-  if #names == 0 then
+local function showPlayerNamesDialog(playerNames)
+  if namesDialog and namesDialog:IsShown() then
+    namesDialog:Hide()
     return
   end
-  
-  local namesList = table.concat(names, "\n")
-  
+
+  if namesDialog then
+    local namesText = table.concat(playerNames, "\n")
+    namesDialog.input:SetText(namesText)
+    namesDialog.input:SetCursorPosition(0)
+    namesDialog:Show()
+    return
+  end
+
   local dialog = CreateFrame("Frame", nil, UIParent, "BasicFrameTemplateWithInset")
   dialog:SetSize(500, 400)
   dialog:SetPoint("CENTER")
@@ -55,78 +26,170 @@ local function showScoreboardCopyDialog()
   dialog:RegisterForDrag("LeftButton")
   dialog:SetScript("OnDragStart", dialog.StartMoving)
   dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
-  dialog:SetFrameStrata("TOOLTIP")
-  dialog:SetFrameLevel(9999)
+  dialog:SetFrameStrata("FULLSCREEN_DIALOG")
+  dialog:SetFrameLevel(1000)
 
   dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   dialog.title:SetPoint("TOP", dialog.TitleBg, "TOP", 0, -5)
-  dialog.title:SetText("Copy Scoreboard Names")
+  dialog.title:SetText("Player Names")
 
   local scrollFrame = CreateFrame("ScrollFrame", nil, dialog, "UIPanelScrollFrameTemplate")
-  scrollFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", 15, -30)
+  scrollFrame:SetPoint("TOPLEFT", dialog, "TOPLEFT", 12, -30)
   scrollFrame:SetPoint("BOTTOMRIGHT", dialog, "BOTTOMRIGHT", -30, 50)
 
-  local editBox = CreateFrame("EditBox", nil, scrollFrame)
-  editBox:SetMultiLine(true)
-  editBox:SetAutoFocus(true)
-  editBox:SetFontObject("ChatFontNormal")
-  editBox:SetWidth(scrollFrame:GetWidth())
-  editBox:SetText(namesList)
-  editBox:HighlightText()
-  editBox:SetScript("OnEscapePressed", function() dialog:Hide() end)
-  editBox:SetScript("OnKeyDown", function(_, key)
-    if key == "C" and (IsControlKeyDown() or IsMetaKeyDown()) then
-      editBox:HighlightText()
-      editBox:SetFocus()
-      C_Timer.After(0.1, function()
-        if dialog:IsShown() then
-          dialog:Hide()
-        end
-      end)
-    end
-  end)
-  editBox:EnableKeyboard(true)
-  editBox:SetScript("OnShow", function(self) self:SetFocus() end)
+  local input = CreateFrame("EditBox", nil, scrollFrame)
+  input:SetMultiLine(true)
+  input:SetMaxLetters(0)
+  input:SetFontObject(GameFontHighlight)
+  input:SetWidth(scrollFrame:GetWidth() - 20)
+  input:SetHeight(5000)
+  input:SetAutoFocus(false)
+  input:SetScript("OnEscapePressed", function() dialog:Hide() end)
 
-  scrollFrame:SetScrollChild(editBox)
+  scrollFrame:SetScrollChild(input)
+  
+  local namesText = table.concat(playerNames, "\n")
+  input:SetText(namesText)
+  input:SetCursorPosition(0)
 
   local helpText = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   helpText:SetPoint("BOTTOM", dialog, "BOTTOM", 0, 20)
-  helpText:SetText(string.format("Press Ctrl+C (Cmd+C on macOS) to copy all %d names.", #names))
+  helpText:SetText("Press Ctrl+C (Cmd+C on macOS) to copy the names.")
 
+  dialog.input = input
+  namesDialog = dialog
   dialog:Show()
 end
 
-local function addScoreboardButton()
-  if not PVPMatchScoreboard or not PVPMatchScoreboard.Content then
+-- Extract player names from scoreboard content
+
+local function extractPlayerNames(contentFrame, callback)
+  if not contentFrame then
+    callback({})
     return
   end
-  
-  if PVPMatchScoreboard.copyNamesButton then
+
+  local playerNames = {}
+  local foundNames = {}
+  local ignoreTexts = {
+    ["Name"] = true,
+    ["Deaths"] = true,
+    ["All"] = true,
+    ["Progress"] = true
+  }
+
+  local scrollBox = contentFrame.scrollBox or contentFrame.ScrollBox
+  if not scrollBox then
+    callback({})
     return
   end
+
+  local scrollTarget = scrollBox.ScrollTarget
+  if not scrollTarget then
+    callback({})
+    return
+  end
+
+  local children = {scrollTarget:GetChildren()}
   
-  local button = CreateFrame("Button", nil, PVPMatchScoreboard.Content, "UIPanelButtonTemplate")
-  button:SetSize(120, 22)
-  button:SetPoint("BOTTOMRIGHT", PVPMatchScoreboard.Content, "BOTTOMRIGHT", -10, 10)
-  button:SetText("Copy Names")
-  button:SetScript("OnClick", showScoreboardCopyDialog)
-  
-  PVPMatchScoreboard.copyNamesButton = button
+  for _, child in ipairs(children) do
+    if child then
+      local grandchildren = {child:GetChildren()}
+      for _, grandchild in ipairs(grandchildren) do
+        if grandchild and grandchild.text then
+          local textObj = grandchild.text
+          if textObj and type(textObj) == "table" and textObj.GetText then
+            local text = textObj:GetText()
+            
+            if text and text ~= "" and not ignoreTexts[text] and not foundNames[text] then
+              local hasNumber = text:match("%d")
+              
+              if not hasNumber then
+                foundNames[text] = true
+                table.insert(playerNames, text)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  callback(playerNames)
 end
+
+-- Create player names button
+
+local function createPlayerNamesButton(parentFrame)
+  if not parentFrame or parentFrame.bentoNamesButton then
+    return
+  end
+
+  local contentFrame = parentFrame.Content or parentFrame.content
+  if not contentFrame then
+    return
+  end
+
+  local button = CreateFrame("Button", nil, contentFrame, "UIPanelButtonTemplate")
+  button:SetSize(120, 25)
+  button:SetText("Player Names")
+  button:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", -10, 10)
+  
+  button:SetScript("OnClick", function()
+    if InCombatLockdown() then
+      return
+    end
+
+    C_Timer.After(0.2, function()
+      extractPlayerNames(contentFrame, function(playerNames)
+        if #playerNames > 0 then
+          showPlayerNamesDialog(playerNames)
+        end
+      end)
+    end)
+  end)
+
+  parentFrame.bentoNamesButton = button
+end
+
+-- Setup buttons on scoreboard frames
+
+local function setupButtons()
+  if PVPMatchScoreboard then
+    createPlayerNamesButton(PVPMatchScoreboard)
+  end
+  
+  if PVPMatchResults then
+    createPlayerNamesButton(PVPMatchResults)
+  end
+end
+
+-- Initialize on PVPUI load
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:SetScript("OnEvent", function(_, _, addonName)
   if addonName == "Blizzard_PVPUI" then
-    C_Timer.After(0.5, function()
-      addScoreboardButton()
-    end)
+    setupButtons()
+    
+    if PVPMatchScoreboard then
+      PVPMatchScoreboard:HookScript("OnShow", function()
+        if not PVPMatchScoreboard.bentoNamesButton then
+          createPlayerNamesButton(PVPMatchScoreboard)
+        end
+      end)
+    end
+    
+    if PVPMatchResults then
+      PVPMatchResults:HookScript("OnShow", function()
+        if not PVPMatchResults.bentoNamesButton then
+          createPlayerNamesButton(PVPMatchResults)
+        end
+      end)
+    end
+    
+    eventFrame:UnregisterEvent("ADDON_LOADED")
   end
 end)
 
-if IsAddOnLoaded("Blizzard_PVPUI") then
-  C_Timer.After(0.5, function()
-    addScoreboardButton()
-  end)
-end
+setupButtons()

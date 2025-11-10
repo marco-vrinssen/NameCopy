@@ -1,8 +1,7 @@
 ## Interface: 110200
 ## Title: Copy All The Names
-## Notes: Right-click to copy player names and extract all names from BG scoreboard
+## Notes: Right-click to copy player names from context menus
 ## Author: MIYANKO
 ## Version: 1.0.0
 
-ContextMenu.lua
-BGScoreboard.lua
+CopyAllTheNames.lua

@@ -1,26 +1,33 @@
 -- Adds "Copy Full Name" menu option to player context menus
 
+-- Group finder menu tags that need special handling
 local finderMenuTags = {
   MENU_LFG_FRAME_SEARCH_ENTRY = true,
   MENU_LFG_FRAME_MEMBER_APPLY = true
 }
 
+-- Valid player context types for standard context menus
 local playerContextTypes = {
   PLAYER = true,
   PARTY = true,
   RAID_PLAYER = true,
   FRIEND = true,
+  FRIEND_OFFLINE = true,
+  FRIEND_ONLINE = true,
   BN_FRIEND = true,
   SELF = true,
   OTHER_PLAYER = true,
   ENEMY_PLAYER = true,
   TARGET = true,
   FOCUS = true,
-  FRIEND_OFFLINE = true,
-  FRIEND_ONLINE = true
+  GUILD = true,
+  COMMUNITIES_GUILD_MEMBER = true,
+  COMMUNITIES_MEMBER = true,
+  COMMUNITIES_WOW_MEMBER = true,
+  PVP_SCOREBOARD = true
 }
 
--- Split full name into player name and realm
+-- Parse player name and realm from full name string
 local function parseNameRealm(fullName)
   if not fullName then
     return nil, nil
@@ -30,12 +37,13 @@ local function parseNameRealm(fullName)
   return playerName or fullName, realmName or GetRealmName()
 end
 
--- Extract player info from group finder frames
+-- Extract player info from group finder frame context
 local function extractFinderPlayer(frameOwner)
   if not frameOwner then
     return nil, nil
   end
 
+  -- Handle LFG search result leader
   if frameOwner.resultID and C_LFGList then
     local searchResult = C_LFGList.GetSearchResultInfo(frameOwner.resultID)
     if searchResult and searchResult.leaderName then
@@ -43,6 +51,7 @@ local function extractFinderPlayer(frameOwner)
     end
   end
 
+  -- Handle LFG applicant member
   if frameOwner.memberIdx then
     local parentFrame = frameOwner:GetParent()
     if parentFrame and parentFrame.applicantID and C_LFGList then
@@ -56,16 +65,7 @@ local function extractFinderPlayer(frameOwner)
   return nil, nil
 end
 
--- Extract player info from BattleNet account
-local function extractBattleNetPlayer(battleNetInfo)
-  if battleNetInfo and battleNetInfo.gameAccountInfo then
-    local gameAccount = battleNetInfo.gameAccountInfo
-    return gameAccount.characterName, gameAccount.realmName
-  end
-  return nil, nil
-end
-
--- Resolve player name and realm from context
+-- Resolve player name and realm from menu context
 local function resolvePlayer(frameOwner, menuRoot, menuContext)
   if not menuContext then
     if menuRoot and menuRoot.tag and finderMenuTags[menuRoot.tag] then
@@ -74,10 +74,20 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     return nil, nil
   end
 
+  -- Direct name and server fields
   if menuContext.name and menuContext.server then
     return menuContext.name, menuContext.server
   end
 
+  -- PVP scoreboard context with unit GUID
+  if menuContext.which == "PVP_SCOREBOARD" and menuContext.unit and C_PvP then
+    local info = C_PvP.GetScoreInfoByPlayerGuid(menuContext.unit)
+    if info and info.name then
+      return parseNameRealm(info.name)
+    end
+  end
+
+  -- Unit-based context
   if menuContext.unit and UnitExists(menuContext.unit) then
     local unitName = UnitName(menuContext.unit)
     if unitName then
@@ -86,17 +96,18 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     end
   end
 
-  if menuContext.accountInfo then
-    local playerName, realmName = extractBattleNetPlayer(menuContext.accountInfo)
-    if playerName and realmName then
-      return playerName, realmName
-    end
+  -- BattleNet friend context
+  if menuContext.accountInfo and menuContext.accountInfo.gameAccountInfo then
+    local gameAccount = menuContext.accountInfo.gameAccountInfo
+    return gameAccount.characterName, gameAccount.realmName
   end
 
+  -- Name-only context
   if menuContext.name then
     return parseNameRealm(menuContext.name)
   end
 
+  -- Friends list context
   if menuContext.friendsList and C_FriendList then
     local friendInfo = C_FriendList.GetFriendInfoByIndex(menuContext.friendsList)
     if friendInfo and friendInfo.name then
@@ -104,10 +115,12 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
     end
   end
 
+  -- Chat whisper target context
   if menuContext.chatTarget then
     return parseNameRealm(menuContext.chatTarget)
   end
 
+  -- Chat log message context
   if menuContext.lineID and menuContext.chatFrame then
     local messageInfo = menuContext.chatFrame:GetMessageInfo(menuContext.lineID)
     if messageInfo and messageInfo.sender then
@@ -118,12 +131,13 @@ local function resolvePlayer(frameOwner, menuRoot, menuContext)
   return nil, nil
 end
 
--- Check if menu context allows copy option
+-- Check if menu context is valid for adding copy option
 local function validateContext(menuRoot, menuContext)
   if not menuContext then
     return menuRoot and menuRoot.tag and finderMenuTags[menuRoot.tag]
   end
-  return menuContext.which and playerContextTypes[menuContext.which]
+  
+  return menuContext.clubId or (menuContext.which and playerContextTypes[menuContext.which])
 end
 
 -- Show dialog with copyable player name
@@ -136,8 +150,8 @@ local function showCopyDialog(playerName)
   dialog:RegisterForDrag("LeftButton")
   dialog:SetScript("OnDragStart", dialog.StartMoving)
   dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
-  dialog:SetFrameStrata("DIALOG")
-  dialog:SetFrameLevel(100)
+  dialog:SetFrameStrata("TOOLTIP")
+  dialog:SetFrameLevel(9999)
 
   dialog.title = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   dialog.title:SetPoint("TOP", dialog.TitleBg, "TOP", 0, -5)
@@ -172,22 +186,14 @@ local function showCopyDialog(playerName)
   dialog:Show()
 end
 
--- Add copy menu button to context menu
+-- Add copy button to context menu
 local function addCopyButton(frameOwner, menuRoot, menuContext)
-  if InCombatLockdown() then
-    return
-  end
-  
-  if not validateContext(menuRoot, menuContext) then
+  if InCombatLockdown() or not validateContext(menuRoot, menuContext) then
     return
   end
 
   local playerName, realmName = resolvePlayer(frameOwner, menuRoot, menuContext)
-  if not (playerName and realmName) then
-    return
-  end
-
-  if not menuRoot or not menuRoot.CreateButton then
+  if not (playerName and realmName and menuRoot and menuRoot.CreateButton) then
     return
   end
   
@@ -202,7 +208,7 @@ local function addCopyButton(frameOwner, menuRoot, menuContext)
   end)
 end
 
--- Menu tags for player context menus
+-- Menu tags to register copy option with
 local menuTags = {
   "MENU_LFG_FRAME_SEARCH_ENTRY",
   "MENU_LFG_FRAME_MEMBER_APPLY",
@@ -210,19 +216,26 @@ local menuTags = {
   "MENU_UNIT_PARTY",
   "MENU_UNIT_RAID_PLAYER",
   "MENU_UNIT_FRIEND",
+  "MENU_UNIT_FRIEND_OFFLINE",
+  "MENU_UNIT_FRIEND_ONLINE",
   "MENU_UNIT_BN_FRIEND",
   "MENU_UNIT_SELF",
   "MENU_UNIT_OTHER_PLAYER",
   "MENU_UNIT_ENEMY_PLAYER",
   "MENU_UNIT_TARGET",
   "MENU_UNIT_FOCUS",
-  "MENU_UNIT_FRIEND_OFFLINE",
-  "MENU_UNIT_FRIEND_ONLINE",
+  "MENU_UNIT_GUILD",
+  "MENU_UNIT_COMMUNITIES_GUILD_MEMBER",
+  "MENU_UNIT_COMMUNITIES_MEMBER",
+  "MENU_UNIT_COMMUNITIES_WOW_MEMBER",
+  "MENU_PVP_SCOREBOARD",
+  "MENU_UNIT_PVP_SCOREBOARD",
+  "MENU_BATTLEGROUND_SCOREBOARD",
   "MENU_CHAT_LOG_LINK",
   "MENU_CHAT_LOG_FRAME"
 }
 
--- Register menu hooks
+-- Register addon with all context menu types
 local function registerMenus()
   if not Menu or not Menu.ModifyMenu then
     return false
@@ -235,7 +248,7 @@ local function registerMenus()
   return true
 end
 
--- Register menus with retry if API not ready
+-- Initialize with retry if menu API not ready
 if not registerMenus() then
   local attempts = 0
   C_Timer.NewTicker(0.5, function(ticker)
@@ -245,3 +258,15 @@ if not registerMenus() then
     end
   end)
 end
+
+-- Register for PVP UI load
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("ADDON_LOADED")
+eventFrame:SetScript("OnEvent", function(_, _, addonName)
+  if addonName == "Blizzard_PVPUI" then
+    C_Timer.After(0.5, function()
+      registerMenus()
+    end)
+    eventFrame:UnregisterEvent("ADDON_LOADED")
+  end
+end)

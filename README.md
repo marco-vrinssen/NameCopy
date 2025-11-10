@@ -7,10 +7,10 @@ World of Warcraft addon to copy player names from context menus and scoreboard.
 - Adds "Copy Full Name" to player context menus
 - Works in unit frames, scoreboards, guild, friends, chat, and group finder
 - Copies Name-Realm format to system clipboard
-- Copies all player names from current scoreboard with command
+- Adds "Copy Names" button to PvP scoreboard for bulk copying
 
 ## Usage
 
 Right-click any player name and select "Copy Full Name".
 
-Use `/copynames` or `/cn` to copy all names from current scoreboard.
+Click "Copy Names" button on PvP scoreboard to copy all player names.

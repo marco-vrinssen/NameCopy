@@ -1,4 +1,4 @@
--- Opens popup to copy all player names from scoreboard
+-- Adds button to PvP scoreboard to copy all player names
 
 local function parseNameRealm(fullName)
   if not fullName then
@@ -97,8 +97,36 @@ local function showScoreboardCopyDialog()
   dialog:Show()
 end
 
-SLASH_COPYNAMES1 = "/copynames"
-SLASH_COPYNAMES2 = "/cn"
-SlashCmdList["COPYNAMES"] = function()
-  showScoreboardCopyDialog()
+local function addScoreboardButton()
+  if not PVPMatchScoreboard or not PVPMatchScoreboard.Content then
+    return
+  end
+  
+  if PVPMatchScoreboard.copyNamesButton then
+    return
+  end
+  
+  local button = CreateFrame("Button", nil, PVPMatchScoreboard.Content, "UIPanelButtonTemplate")
+  button:SetSize(120, 22)
+  button:SetPoint("BOTTOMRIGHT", PVPMatchScoreboard.Content, "BOTTOMRIGHT", -10, 10)
+  button:SetText("Copy Names")
+  button:SetScript("OnClick", showScoreboardCopyDialog)
+  
+  PVPMatchScoreboard.copyNamesButton = button
+end
+
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("ADDON_LOADED")
+eventFrame:SetScript("OnEvent", function(_, _, addonName)
+  if addonName == "Blizzard_PVPUI" then
+    C_Timer.After(0.5, function()
+      addScoreboardButton()
+    end)
+  end
+end)
+
+if IsAddOnLoaded("Blizzard_PVPUI") then
+  C_Timer.After(0.5, function()
+    addScoreboardButton()
+  end)
 end
